@@ -91,18 +91,133 @@ make up
 ## Repository Structure
 ```text
 blockchain-fraud-detection
+├── .github
+│   └── workflows
+│       └── ci.yml
 ├── apps
-│   ├── contracts
-│   ├── rust-risk-engine
-│   ├── rust-indexer
 │   ├── api
+│   │   └── app
+│   │       ├── api
+│   │       │   ├── __init__.py
+│   │       │   └── routes.py
+│   │       ├── core
+│   │       │   ├── __init__.py
+│   │       │   ├── config.py
+│   │       │   └── logging.py
+│   │       ├── domain
+│   │       │   ├── entities
+│   │       │   │   ├── __init__.py
+│   │       │   │   └── transaction.py
+│   │       │   ├── repositories
+│   │       │   │   └── __init__.py
+│   │       │   ├── services
+│   │       │   │   ├── __init__.py
+│   │       │   │   └── fraud_detection_service.py
+│   │       │   └── __init__.py
+│   │       ├── infrastructure
+│   │       │   ├── chains
+│   │       │   │   ├── __init__.py
+│   │       │   │   └── rpc_client.py
+│   │       │   ├── graph
+│   │       │   │   ├── __init__.py
+│   │       │   │   └── wallet_graph_engine.py
+│   │       │   ├── ingestion
+│   │       │   │   ├── __init__.py
+│   │       │   │   └── event_consumer.py
+│   │       │   ├── timeseries
+│   │       │   │   ├── __init__.py
+│   │       │   │   └── anomaly_detector.py
+│   │       │   └── __init__.py
+│   │       ├── schemas
+│   │       │   ├── __init__.py
+│   │       │   └── fraud.py
+│   │       ├── __init__.py
+│   │       └── main.py
+│   ├── contracts
+│   │   ├── script
+│   │   │   └── Deploy.s.sol
+│   │   ├── src
+│   │   │   ├── access
+│   │   │   │   └── Ownable.sol
+│   │   │   ├── core
+│   │   │   │   ├── FraudConsensusEngine.sol
+│   │   │   │   ├── MultiChainFraudRegistry.sol
+│   │   │   │   ├── ReporterRegistry.sol
+│   │   │   │   └── WalletIdentityResolver.sol
+│   │   │   ├── interfaces
+│   │   │   │   ├── IFraudConsensusEngine.sol
+│   │   │   │   └── IWalletIdentityResolver.sol
+│   │   │   ├── libraries
+│   │   │   │   ├── RiskMath.sol
+│   │   │   │   └── Types.sol
+│   │   │   └── FraudSignalRegistry.sol
+│   │   ├── test
+│   │   │   ├── core
+│   │   │   │   ├── FraudConsensusEngine.t.sol
+│   │   │   │   └── MultiChainFraudRegistry.t.sol
+│   │   │   └── FraudSignalRegistry.t.sol
+│   │   └── foundry.toml
+│   ├── rust-indexer
+│   │   ├── src
+│   │   │   └── main.rs
+│   │   └── Cargo.toml
+│   ├── rust-risk-engine
+│   │   ├── src
+│   │   │   ├── lib.rs
+│   │   │   └── main.rs
+│   │   ├── tests
+│   │   │   └── integration.rs
+│   │   └── Cargo.toml
 │   └── worker
+│       └── worker
+│           ├── connectors
+│           │   ├── __init__.py
+│           │   └── stream.py
+│           ├── core
+│           │   ├── __init__.py
+│           │   └── config.py
+│           ├── jobs
+│           │   ├── __init__.py
+│           │   └── ingest_job.py
+│           ├── __init__.py
+│           └── main.py
 ├── infra
+│   ├── docker
+│   │   └── docker-compose.yml
+│   ├── k8s
+│   │   ├── api-deployment.yaml
+│   │   └── worker-deployment.yaml
+│   ├── monitoring
+│   │   └── prometheus.yml
+│   └── terraform
+│       └── main.tf
 ├── ml
+│   ├── features
+│   │   └── cross_chain_identity.py
+│   ├── graph_model
+│   │   └── train_graph_model.py
+│   ├── notebooks
+│   │   └── .gitkeep
+│   └── timeseries
+│       └── train_timeseries_model.py
+├── scripts
+│   └── bootstrap.sh
 ├── tests
+│   ├── integration
+│   │   └── test_health_endpoint.py
+│   └── unit
+│       ├── test_fraud_detection.py
+│       └── test_wallet_graph_engine.py
+├── .env.example
+├── .gitignore
+├── .gitkeep
 ├── Cargo.toml
+├── Dockerfile.api
+├── Dockerfile.worker
 ├── Makefile
-└── README.md
+├── README.md
+├── load_test.py
+└── pyproject.toml
 ```
 
 ## Future Improvements
