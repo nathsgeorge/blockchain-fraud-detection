@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.env
+*.log
+.DS_Store
+apps/contracts/out/
+apps/contracts/cache/
+/target/
+Cargo.lock
