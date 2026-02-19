@@ -1,172 +1,134 @@
 # MultiChain Fraud Intelligence system
 
+Solidity-first multi-chain fraud intelligence stack for Ethereum, BSC, and Polygon with on-chain consensus, wallet identity graphing, and anchored risk attestations.
+
 ## Project Summary
-MultiChain Fraud Intelligence system is a production-oriented AI fraud analytics platform for Ethereum, BSC, and Polygon. It combines event-driven ingestion, graph machine learning, time-series anomaly detection, and smart contract attestations into an explainable fraud risk pipeline.
+This repository is designed like a blockchain analytics startup platform where the core fraud intelligence lifecycle is executed on-chain. Fraud reporters submit weighted votes, consensus is finalized in Solidity, cross-chain wallet identities are resolved on-chain, and finalized fraud signals are immutably anchored for downstream compliance and exchange risk controls.
 
 ## Business Problem
-Fraudulent wallets exploit bridge latency, chain fragmentation, and weak cross-chain identity visibility. Traditional single-chain monitoring misses coordinated laundering and flash-mob exploit behavior.
+Fraud rings coordinate exploits and laundering paths across chains. Off-chain only detection systems suffer from trust gaps, unverifiable scoring logic, and fragmented risk signals across infrastructure partners.
 
 ## Solution
-This repository implements a distributed architecture that ingests multi-chain activity, resolves wallet identities across chains, computes graph and temporal risk features, serves fraud scores through an API, and optionally anchors fraud signals on-chain for tamper-evident auditability.
+A mostly-Solidity system where fraud decisions and attestations are governed by smart contracts:
+- `FraudConsensusEngine`: weighted voting from approved reporters
+- `WalletIdentityResolver`: cross-chain cluster resolution
+- `MultiChainFraudRegistry`: immutable anchoring of finalized signals
+- `FraudSignalRegistry`: lightweight legacy attestation interface
+
+Python services remain as adapters for ingestion, ML feature extraction, and API access.
 
 ## Multi-Chain Architecture
 ```mermaid
 flowchart LR
-A[Ethereum RPC] --> I[Ingestion Worker]
-B[BSC RPC] --> I
-C[Polygon RPC] --> I
-I --> R[(Redis Stream)]
-R --> W[Feature Worker]
-W --> G[Graph Engine]
-W --> T[Time-Series Detector]
-G --> S[Fraud Scoring Service]
-T --> S
-S --> API[FastAPI /v1/analyze]
-S --> SC[Solidity FraudSignalRegistry]
-API --> O[Prometheus Metrics]
+E[ETH events] --> I[Off-chain Ingestion]
+B[BSC events] --> I
+P[Polygon events] --> I
+I --> M[ML Feature Services]
+M --> V[Fraud Reporters]
+V --> C[FraudConsensusEngine.sol]
+V --> R[WalletIdentityResolver.sol]
+C --> A[MultiChainFraudRegistry.sol]
+R --> A
+A --> X[Exchanges/Compliance]
+A --> API[FastAPI read APIs]
 ```
 
 ## Graph ML Explanation
-The graph engine builds directed wallet transaction graphs and computes structural features such as PageRank and degree centrality. The risk score reflects wallet influence and suspicious neighborhood characteristics often linked to fund dispersion patterns.
+Graph ML extracts suspicious wallet topology and flow patterns off-chain. Reporters submit model-backed scores on-chain with confidence weights. Consensus score is derived by Solidity weighted averaging to guarantee deterministic verification.
 
 ## Cross-Chain Identity Resolution
-Wallet fingerprints encode behavioral signatures such as gas price patterns, active-hour entropy, and bridge counterparties. Similarity scoring links wallets likely controlled by the same operator across Ethereum, BSC, and Polygon.
+`WalletIdentityResolver` links wallets into fraud clusters (`clusterId`) across chain IDs, including confidence scores. Anchored fraud records carry the cluster ID so downstream consumers can block related wallets, not just a single address.
 
 ## Smart Contract Design
-`FraudSignalRegistry.sol` stores high-confidence fraud signals with reporter gating. It emits immutable events used by compliance systems and partners requiring cryptographic audit trails.
+### Core contracts
+- `ReporterRegistry.sol`: owner-managed reporter allowlist
+- `FraudConsensusEngine.sol`: weighted vote aggregation and quorum finalization
+- `WalletIdentityResolver.sol`: chain-aware wallet clustering
+- `MultiChainFraudRegistry.sol`: final signal anchor with identity context
+- `FraudSignalRegistry.sol`: simple compatibility registry
+
+### Solidity snippet
+```solidity
+st.totalWeight += confidenceBps;
+st.weightedScoreSum += uint256(scoreBps) * confidenceBps;
+if (st.totalWeight >= quorumWeight) {
+    _finalize(signalId, st);
+}
+```
 
 ## Scalability Considerations
-- Event-driven Redis streams decouple ingestion from scoring.
-- Stateless API pods scale horizontally on Kubernetes.
-- Worker deployments can be sharded by chain and stream partition.
-- Models are isolated in `ml/` for independent training/deployment cadence.
+- Reporter horizontal scale with stake-based governance extensions
+- Multi-chain shards by `chainId` and signal namespace
+- Stateless off-chain services; immutable on-chain canonical state
+- Batching reporter commits for gas-optimized anchoring
 
 ## Security Considerations
-- Reporter allowlist and ownership controls in smart contract.
-- Strict typed schemas and input validation in API.
-- Environment-based secrets for RPC keys and infra credentials.
-- CI lint/test gates to reduce unsafe changes.
+- Strict reporter authorization with owner-controlled rotation
+- Quorum-based finalization to reduce single-reporter manipulation
+- Confidence-weighted vote aggregation with bounded bps checks
+- Immutable on-chain audit trail for post-incident forensics
 
 ## Observability
-- `/metrics` endpoint exposes Prometheus-compatible telemetry.
-- Structured JSON logs for ingestion and scoring events.
-- Docker Compose includes Prometheus bootstrap for local observability.
+- Contract event streams (`VoteSubmitted`, `SignalFinalized`, `SignalAnchored`)
+- API metrics endpoint for adapter performance
+- Prometheus + structured logs in Docker stack
 
 ## Simulated Throughput Metrics
-From Locust baseline load profile (`50` users, spawn `10/s`, local Docker):
-- P95 latency: `82ms`
-- Mean RPS: `410`
-- Error rate: `<0.2%`
-- Worker stream lag under burst: `<1.5s`
+Local simulation target profile:
+- Reporter votes: 150 tx/minute
+- Finalization latency: < 2 blocks after quorum
+- Anchor writes: 30 tx/minute
+- API p95: < 100ms for read paths
 
 ## Deployment Instructions
-1. Bootstrap:
-   ```bash
-   ./scripts/bootstrap.sh
-   ```
-2. Start stack:
-   ```bash
-   make up
-   ```
-3. API local run:
-   ```bash
-   make run-api
-   ```
-4. Kubernetes manifests:
-   ```bash
-   kubectl apply -f infra/k8s/
-   ```
+### Contracts
+```bash
+cd apps/contracts
+forge build
+forge test -vv
+forge script script/Deploy.s.sol:Deploy --rpc-url $RPC_URL --broadcast
+```
+
+### Full stack
+```bash
+./scripts/bootstrap.sh
+make up
+```
 
 ## API Documentation
 ### POST `/v1/analyze`
-Request:
-```json
-{
-  "wallet_address": "0xabc123",
-  "chains": ["ethereum", "bsc", "polygon"],
-  "transactions": [
-    {
-      "tx_hash": "0x1",
-      "chain": "ethereum",
-      "from_address": "0xaaa",
-      "to_address": "0xabc123",
-      "value": 100.5,
-      "timestamp": 1710000100
-    }
-  ]
-}
-```
-Response:
-```json
-{
-  "wallet_address": "0xabc123",
-  "fraud_score": 0.81,
-  "risk_level": "critical",
-  "reasons": [
-    "Wallet has suspicious graph centrality and high-risk neighbors"
-  ]
-}
-```
+Accepts wallet + transaction payload and returns explainable fraud score.
 
-## Key Features with Code Snippet
-```python
-# apps/api/app/domain/services/fraud_detection_service.py
-final_score = round(mean([graph_score, anomaly_score, cross_chain_score]), 4)
-```
-The fraud engine fuses graph, temporal, and cross-chain intelligence into one explainable score.
+### GET `/v1/health`
+Service health probe.
+
+### GET `/metrics`
+Prometheus scrape endpoint.
 
 ## Repository Structure
 ```text
 blockchain-fraud-detection
-├── .github
-│   └── workflows
-│       └── ci.yml
 ├── apps
-│   ├── api
-│   │   └── app
-│   │       ├── api
-│   │       ├── core
-│   │       ├── domain
-│   │       ├── infrastructure
-│   │       ├── schemas
-│   │       └── main.py
 │   ├── contracts
 │   │   ├── src
+│   │   │   ├── access
+│   │   │   ├── core
+│   │   │   ├── interfaces
+│   │   │   └── libraries
+│   │   ├── script
 │   │   └── test
+│   ├── api
 │   └── worker
-│       └── worker
 ├── infra
-│   ├── docker
-│   ├── k8s
-│   ├── monitoring
-│   └── terraform
 ├── ml
-│   ├── features
-│   ├── graph_model
-│   ├── notebooks
-│   └── timeseries
-├── scripts
 ├── tests
-│   ├── integration
-│   └── unit
-├── .env.example
-├── .gitignore
-├── Dockerfile.api
-├── Dockerfile.worker
 ├── Makefile
 ├── load_test.py
-├── pyproject.toml
 └── README.md
 ```
 
-## Architecture Decisions
-- Python FastAPI for low-latency typed API and MLOps compatibility.
-- Redis streams for lightweight event bus with replay semantics.
-- IsolationForest + graph centrality for interpretable baseline ML.
-- Foundry-compatible Solidity contract for fraud signal registry.
-
 ## Future Improvements
-- Replace heuristic graph score with GNN embeddings.
-- Add Kafka + Flink pipeline for high-throughput stream joins.
-- Integrate feature store and model registry.
-- Add zero-knowledge attestations for privacy-preserving signal sharing.
+- Add staking/slashing for malicious reporters
+- Add optimistic fraud proofs and challenge windows
+- Add zk-attested reporter model outputs
+- Integrate L2 settlement and calldata compression

@@ -1,4 +1,4 @@
-.PHONY: install lint test run-api run-worker up down load-test
+.PHONY: install lint test run-api run-worker up down load-test forge-test forge-build
 
 install:
 	pip install -e .[dev]
@@ -26,3 +26,9 @@ down:
 
 load-test:
 	locust -f load_test.py --host http://localhost:8000
+
+forge-build:
+	cd apps/contracts && forge build
+
+forge-test:
+	cd apps/contracts && forge test -vv
