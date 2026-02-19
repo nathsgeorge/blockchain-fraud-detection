@@ -7,7 +7,7 @@ name = "multichain-fraud-intelligence"
 version = "0.1.0"
 description = "Production-ready multi-chain AI fraud intelligence platform"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
   "fastapi>=0.111.0",
   "uvicorn[standard]>=0.30.0",
@@ -41,3 +41,7 @@ line-length = 100
 [tool.pytest.ini_options]
 pythonpath = ["apps/api", "apps/worker"]
 testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+where = ["apps/api", "apps/worker"]
+include = ["app*", "worker*"]
