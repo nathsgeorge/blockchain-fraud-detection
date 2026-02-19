@@ -1,84 +1,65 @@
 # MultiChain Fraud Intelligence system
 
-Solidity-first multi-chain fraud intelligence stack for Ethereum, BSC, and Polygon with on-chain consensus, wallet identity graphing, and anchored risk attestations.
+Solidity-first and Rust-accelerated multi-chain fraud intelligence stack for Ethereum, BSC, and Polygon.
 
 ## Project Summary
-This repository is designed like a blockchain analytics startup platform where the core fraud intelligence lifecycle is executed on-chain. Fraud reporters submit weighted votes, consensus is finalized in Solidity, cross-chain wallet identities are resolved on-chain, and finalized fraud signals are immutably anchored for downstream compliance and exchange risk controls.
+This repository models a startup-grade fraud platform where canonical risk consensus and identity linkage are on-chain, while low-latency scoring and indexing are handled by Rust services and Python adapters.
 
 ## Business Problem
-Fraud rings coordinate exploits and laundering paths across chains. Off-chain only detection systems suffer from trust gaps, unverifiable scoring logic, and fragmented risk signals across infrastructure partners.
+Fraud campaigns distribute activity across chains and wallets. Pure off-chain systems lack shared trust guarantees and often create inconsistent partner risk decisions.
 
 ## Solution
-A mostly-Solidity system where fraud decisions and attestations are governed by smart contracts:
-- `FraudConsensusEngine`: weighted voting from approved reporters
-- `WalletIdentityResolver`: cross-chain cluster resolution
-- `MultiChainFraudRegistry`: immutable anchoring of finalized signals
-- `FraudSignalRegistry`: lightweight legacy attestation interface
-
-Python services remain as adapters for ingestion, ML feature extraction, and API access.
+- Solidity contracts finalize fraud consensus and anchor immutable signals
+- Rust risk engine computes deterministic weighted fraud score artifacts
+- Rust indexer ingests anchored signal events for compliance/search pipelines
+- Python API/worker acts as integration adapter for ingestion and ML feature prep
 
 ## Multi-Chain Architecture
 ```mermaid
 flowchart LR
-E[ETH events] --> I[Off-chain Ingestion]
-B[BSC events] --> I
-P[Polygon events] --> I
-I --> M[ML Feature Services]
-M --> V[Fraud Reporters]
-V --> C[FraudConsensusEngine.sol]
-V --> R[WalletIdentityResolver.sol]
+E[Ethereum] --> I[Ingestion]
+B[BSC] --> I
+P[Polygon] --> I
+I --> RUST1[rust-risk-engine]
+RUST1 --> C[FraudConsensusEngine.sol]
+I --> C
 C --> A[MultiChainFraudRegistry.sol]
-R --> A
-A --> X[Exchanges/Compliance]
-A --> API[FastAPI read APIs]
+A --> RUST2[rust-indexer]
+A --> API[FastAPI adapter]
 ```
 
 ## Graph ML Explanation
-Graph ML extracts suspicious wallet topology and flow patterns off-chain. Reporters submit model-backed scores on-chain with confidence weights. Consensus score is derived by Solidity weighted averaging to guarantee deterministic verification.
+Graph and temporal features are computed off-chain, then transformed into reporter votes. The Rust risk engine provides reproducible scoring logic before publishing scores to Solidity consensus.
 
 ## Cross-Chain Identity Resolution
-`WalletIdentityResolver` links wallets into fraud clusters (`clusterId`) across chain IDs, including confidence scores. Anchored fraud records carry the cluster ID so downstream consumers can block related wallets, not just a single address.
+`WalletIdentityResolver.sol` maps `(chainId, wallet)` to cluster identities, enabling signal propagation to related addresses across chains.
 
 ## Smart Contract Design
-### Core contracts
-- `ReporterRegistry.sol`: owner-managed reporter allowlist
-- `FraudConsensusEngine.sol`: weighted vote aggregation and quorum finalization
-- `WalletIdentityResolver.sol`: chain-aware wallet clustering
-- `MultiChainFraudRegistry.sol`: final signal anchor with identity context
-- `FraudSignalRegistry.sol`: simple compatibility registry
-
-### Solidity snippet
-```solidity
-st.totalWeight += confidenceBps;
-st.weightedScoreSum += uint256(scoreBps) * confidenceBps;
-if (st.totalWeight >= quorumWeight) {
-    _finalize(signalId, st);
-}
-```
+- `ReporterRegistry.sol`
+- `FraudConsensusEngine.sol`
+- `WalletIdentityResolver.sol`
+- `MultiChainFraudRegistry.sol`
+- `FraudSignalRegistry.sol`
 
 ## Scalability Considerations
-- Reporter horizontal scale with stake-based governance extensions
-- Multi-chain shards by `chainId` and signal namespace
-- Stateless off-chain services; immutable on-chain canonical state
-- Batching reporter commits for gas-optimized anchoring
+- Solidity contracts are minimal and event-centric
+- Rust services support high-throughput event decoding/scoring
+- Python services remain stateless and horizontally scalable
 
 ## Security Considerations
-- Strict reporter authorization with owner-controlled rotation
-- Quorum-based finalization to reduce single-reporter manipulation
-- Confidence-weighted vote aggregation with bounded bps checks
-- Immutable on-chain audit trail for post-incident forensics
+- Reporter allowlist and ownership controls
+- Quorum-weighted voting with bounded score math
+- Immutable anchoring and event replay
 
 ## Observability
-- Contract event streams (`VoteSubmitted`, `SignalFinalized`, `SignalAnchored`)
-- API metrics endpoint for adapter performance
-- Prometheus + structured logs in Docker stack
+- Contract events for every vote/finalization/anchor
+- Prometheus endpoint in API adapter
+- Rust service logs for scoring/indexing pipelines
 
 ## Simulated Throughput Metrics
-Local simulation target profile:
-- Reporter votes: 150 tx/minute
-- Finalization latency: < 2 blocks after quorum
-- Anchor writes: 30 tx/minute
-- API p95: < 100ms for read paths
+- 150 reporter votes/minute
+- <2-block finalization after quorum
+- Rust indexing throughput target: 4k events/sec per instance
 
 ## Deployment Instructions
 ### Contracts
@@ -89,6 +70,13 @@ forge test -vv
 forge script script/Deploy.s.sol:Deploy --rpc-url $RPC_URL --broadcast
 ```
 
+### Rust
+```bash
+cargo test --workspace
+make rust-run-risk
+make rust-run-indexer
+```
+
 ### Full stack
 ```bash
 ./scripts/bootstrap.sh
@@ -96,39 +84,28 @@ make up
 ```
 
 ## API Documentation
-### POST `/v1/analyze`
-Accepts wallet + transaction payload and returns explainable fraud score.
-
-### GET `/v1/health`
-Service health probe.
-
-### GET `/metrics`
-Prometheus scrape endpoint.
+- `POST /v1/analyze`
+- `GET /v1/health`
+- `GET /metrics`
 
 ## Repository Structure
 ```text
 blockchain-fraud-detection
 ├── apps
 │   ├── contracts
-│   │   ├── src
-│   │   │   ├── access
-│   │   │   ├── core
-│   │   │   ├── interfaces
-│   │   │   └── libraries
-│   │   ├── script
-│   │   └── test
+│   ├── rust-risk-engine
+│   ├── rust-indexer
 │   ├── api
 │   └── worker
 ├── infra
 ├── ml
 ├── tests
+├── Cargo.toml
 ├── Makefile
-├── load_test.py
 └── README.md
 ```
 
 ## Future Improvements
-- Add staking/slashing for malicious reporters
-- Add optimistic fraud proofs and challenge windows
-- Add zk-attested reporter model outputs
-- Integrate L2 settlement and calldata compression
+- Add slashing-enabled reporter staking
+- Add Rust gRPC index/query plane
+- Add zero-knowledge reporter attestations

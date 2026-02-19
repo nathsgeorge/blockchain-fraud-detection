@@ -1,4 +1,4 @@
-.PHONY: install lint test run-api run-worker up down load-test forge-test forge-build
+.PHONY: install lint test run-api run-worker up down load-test forge-test forge-build rust-test rust-run-risk rust-run-indexer
 
 install:
 	pip install -e .[dev]
@@ -32,3 +32,12 @@ forge-build:
 
 forge-test:
 	cd apps/contracts && forge test -vv
+
+rust-test:
+	cargo test --workspace
+
+rust-run-risk:
+	echo '{"graph_score":0.9,"timeseries_score":0.8,"cross_chain_score":0.7,"reporter_confidence_bps":9000}' | cargo run -p rust-risk-engine --bin risk-cli
+
+rust-run-indexer:
+	cargo run -p rust-indexer

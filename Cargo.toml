@@ -1,0 +1,6 @@
+[workspace]
+members = [
+  "apps/rust-risk-engine",
+  "apps/rust-indexer"
+]
+resolver = "2"
