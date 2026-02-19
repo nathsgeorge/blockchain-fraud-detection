@@ -1,0 +1,30 @@
+version: "3.9"
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.api
+    env_file:
+      - ../../.env.example
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+  worker:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.worker
+    env_file:
+      - ../../.env.example
+    depends_on:
+      - redis
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    volumes:
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"

@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraud-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fraud-worker
+  template:
+    metadata:
+      labels:
+        app: fraud-worker
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/example/blockchain-fraud-detection-worker:latest
+          envFrom:
+            - secretRef:
+                name: fraud-api-secrets
